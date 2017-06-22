@@ -118,7 +118,7 @@ def apply_L(u):
 # Setup
 import numpy as np
 import matplotlib.pyplot as plt
-run_errs = np.zeros((6, 20))
+run_errs = np.zeros((5, 7))
 run_delx = run_errs.copy()
 
 q_deg = 8       # degree of quadrature
@@ -129,8 +129,8 @@ def f_true(x):  # true function
     return (x**2 * (x - 3 * np.pi)**2) / 500
 
 # Run FE with different p_deg, n
-for p_deg in range(2, 6):
-    for n in range(10, 20):
+for p_deg in range(2, 5):
+    for n in range(10, 70, 10):
         # Setup
         pts = n * (p_deg + 1) - (n - 1) - 2 # number of points
 
@@ -200,12 +200,12 @@ for p_deg in range(2, 6):
         u_true = f_true(x_vals)
         norm = np.max(np.abs(u_true - u_new))
 
-        run_errs[p_deg, n] = norm
-        run_delx[p_deg, n] = h / (p_deg + 1)
+        run_errs[p_deg, int(n / 10)] = norm
+        run_delx[p_deg, int(n / 10)] = h / (p_deg + 1)
 
 # Plot
-for p_deg in range(2, 6):
-    plt.loglog(run_delx[p_deg, 10:], run_errs[p_deg, 10:], label = 'p = '+str(p_deg))
+for p_deg in range(2, 5):
+    plt.loglog(run_delx[p_deg, :], run_errs[p_deg, :], label = 'p = '+str(p_deg))
 plt.legend()
 plt.xlabel('dx')
 plt.ylabel('||error||')
