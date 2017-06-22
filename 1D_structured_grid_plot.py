@@ -115,86 +115,108 @@ def apply_L(u):
     return Lu
 
 # Main Code
-
 # Setup
 import numpy as np
+import matplotlib.pyplot as plt
+run_errs = np.zeros((6, 20))
+run_delx = run_errs.copy()
 
-p_deg = 3                           # degree of shape functions
-q_deg = 5                           # degree of quadrature
-n = 3                               # number of elements
-pts = n * (p_deg + 1) - (n - 1) - 2 # number of points
+q_deg = 8       # degree of quadrature
+def f(x):       # forcing function
+    return (18 * np.pi**2 - 36 * np.pi * x + 12 * x**2) / 500
 
-I = [0, np.pi]                  # interval
-h = (I[1] - I[0]) / n               # element width
+def f_true(x):  # true function
+    return (x**2 * (x - 3 * np.pi)**2) / 500
 
-def f(x):                           # forcing function
-    return -np.sin(x)
+# Run FE with different p_deg, n
+for p_deg in range(2, 6):
+    for n in range(10, 20):
+        # Setup
+        pts = n * (p_deg + 1) - (n - 1) - 2 # number of points
 
-# Setup Element
-B, D, q, W = element_setup()
+        I = [0, 3 * np.pi]                  # interval
+        h = (I[1] - I[0]) / n               # element width
 
-# Build J, (dX/dx)
-# 1D uniform grid
-# x = (X + 1) * h / 2 + a
-# dx/dX = h / 2
-# |J| = h / 2
-dX = 2 / h
-J = h / 2
+        # Setup Element
+        B, D, q, W = element_setup()
 
-# Build Load Vector
+        # Build J, (dX/dx)
+        # 1D uniform grid
+        # x = (X + 1) * h / 2 + a
+        # dx/dX = h / 2
+        # |J| = h / 2
+        dX = 2 / h
+        J = h / 2
 
-# Boundaries
-# Left
-E = np.zeros((p_deg, pts))
-E[:, :p_deg] = np.eye(p_deg)
-# Add to Mf
-Mf = np.dot(E.T, B[:, 1:].T).dot(W).dot(J).dot(np.diag(f((q + 1) / dX))).dot(B[:, 1:]).dot(E).dot(np.ones(pts))
-# Right
-# Build E
-E = np.zeros((p_deg, pts))
-E[:, -p_deg:] = np.eye(p_deg)
-# Add to Mf
-Mf += np.dot(E.T, B[:, :-1].T).dot(W).dot(J).dot(np.diag(f((q + 1) / dX + h * (n - 1)))).dot(B[:, :-1]).dot(E).dot(np.ones(pts))
-print(f((q + 1) / dX))
-# Interior
-for i in range(1, n - 1):
-    # Build E
-    E = np.zeros((p_deg + 1, pts))
-    E[:, i * p_deg - 1: (i + 1) * p_deg] = np.eye(p_deg + 1)
-    Mf += np.dot(E.T, B.T).dot(W).dot(J).dot(np.diag(f((q + 1) / dX + h * i))).dot(B).dot(E).dot(np.ones(pts))
+        # Build Load Vector
 
-# Iterate to solution
-# Conjugate gradient
-u_old = np.array(np.random.rand(pts))
-r_old = Mf - (-apply_L(u_old))
-p_old = r_old.copy()
-norm = 1
-itr = 1
+        # Boundaries
+        # Left
+        E = np.zeros((p_deg, pts))
+        E[:, :p_deg] = np.eye(p_deg)
+        # Add to Mf
+        Mf = np.dot(E.T, B[:, 1:].T).dot(W).dot(J).dot(np.diag(f((q + 1) / dX))).dot(B[:, 1:]).dot(E).dot(np.ones(pts))
+        # Right
+        # Build E
+        E = np.zeros((p_deg, pts))
+        E[:, -p_deg:] = np.eye(p_deg)
+        # Add to Mf
+        Mf += np.dot(E.T, B[:, :-1].T).dot(W).dot(J).dot(np.diag(f((q + 1) / dX + h * (n - 1)))).dot(B[:, :-1]).dot(E).dot(np.ones(pts))
 
-while norm > 10**-16 and itr < 10*pts:
-    # Calculate new values
-    a = np.dot(r_old.T, r_old) / np.dot(p_old.T, (-apply_L(p_old)))
-    u_new = u_old + a * p_old
-    r_new = r_old - a * (-apply_L(p_old))
-    b = np.dot(r_new.T, r_new) / np.dot(r_old.T, r_old)
-    p_new = r_new + b * p_old
+        # Interior
+        for i in range(1, n - 1):
+            # Build E
+            E = np.zeros((p_deg + 1, pts))
+            E[:, i * p_deg - 1: (i + 1) * p_deg] = np.eye(p_deg + 1)
+            Mf += np.dot(E.T, B.T).dot(W).dot(J).dot(np.diag(f((q + 1) / dX + h * i))).dot(B).dot(E).dot(np.ones(pts))
 
-    # Calculate error
-    norm = np.abs(np.max(r_new))
+        # Iterate to solution
+        # Conjugate gradient
+        u_old = np.array(np.random.rand(pts))
+        r_old = Mf - (-apply_L(u_old))
+        p_old = r_old.copy()
+        norm = 1
+        itr = 1
 
-    # Prepate for next iteration
-    itr += 1
-    u_old = u_new.copy()
-    r_old = r_new.copy()
-    p_old = p_new.copy()
+        while norm > 10**-16 and itr < 10*pts:
+            # Calculate new values
+            a = np.dot(r_old.T, r_old) / np.dot(p_old.T, (-apply_L(p_old)))
+            u_new = u_old + a * p_old
+            r_new = r_old - a * (-apply_L(p_old))
+            b = np.dot(r_new.T, r_new) / np.dot(r_old.T, r_old)
+            p_new = r_new + b * p_old
 
-if itr == 10*pts:
-    print('max itr reached')
+            # Calculate error
+            norm = np.abs(np.max(r_new))
+
+            # Prepate for next iteration
+            itr += 1
+            u_old = u_new.copy()
+            r_old = r_new.copy()
+            p_old = p_new.copy()
+
+        # Calculate error
+        x_vals = np.linspace(I[0] + h / (p_deg + 1), I[1] - h / (p_deg + 1), pts)
+        u_true = f_true(x_vals)
+        norm = np.max(np.abs(u_true - u_new))
+
+        run_errs[p_deg, n] = norm
+        run_delx[p_deg, n] = h / (p_deg + 1)
 
 # Plot
-import matplotlib.pyplot as plt
-x_vals = np.linspace(I[0] + h / (p_deg + 1), I[1] - h / (p_deg + 1), pts)
-u_true = - f(x_vals)
-plt.plot(x_vals, u_true)
-plt.plot(x_vals, u_new)
+for p_deg in range(2, 6):
+    plt.loglog(run_delx[p_deg, 10:], run_errs[p_deg, 10:], label = 'p = '+str(p_deg))
+plt.legend()
+plt.xlabel('dx')
+plt.ylabel('||error||')
+plt.title('Error vs dx')
+plt.show()
+
+# Plot last result
+plt.plot(x_vals, u_true, label = 'True Solution')
+plt.plot(x_vals, u_new, label = 'Calculated Solution')
+plt.legend()
+plt.xlabel('x')
+plt.ylabel('u')
+plt.title('Calculated vs True')
 plt.show()
