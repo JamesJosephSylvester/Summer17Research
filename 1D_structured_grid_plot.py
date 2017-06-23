@@ -118,7 +118,8 @@ def apply_L(u):
 # Setup
 import numpy as np
 import matplotlib.pyplot as plt
-run_errs = np.zeros((5, 7))
+p_degs = range(2, 7)
+run_errs = np.zeros((max(p_degs)+1, 7))
 run_delx = run_errs.copy()
 
 q_deg = 8       # degree of quadrature
@@ -132,7 +133,7 @@ def f_true(x):  # true function
     return np.tanh(x)*np.sin(x)
 
 # Run FE with different p_deg, n
-for p_deg in range(2, 5):
+for p_deg in p_degs:
     for n in range(10, 70, 10):
         # Setup
         pts = n * (p_deg + 1) - (n - 1) - 2 # number of points
@@ -207,8 +208,8 @@ for p_deg in range(2, 5):
         run_delx[p_deg, int(n / 10)] = h / (p_deg + 1)
 
 # Plot
-symbols = iter(['o', '^', 's', '*'])
-for p_deg in range(2, 5):
+symbols = iter(['o', '^', 's', '*', '>', '+'])
+for p_deg in p_degs:
     plt.loglog(run_delx[p_deg, :], run_errs[p_deg, :], next(symbols), label = 'p = '+str(p_deg))
     plt.loglog(run_delx[p_deg, :], run_delx[p_deg, :]**(p_deg+1), label='$h^{%d}$'%(p_deg+1))
 plt.legend()
