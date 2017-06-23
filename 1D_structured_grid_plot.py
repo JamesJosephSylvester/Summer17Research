@@ -110,7 +110,7 @@ def apply_L(u):
         E = np.zeros((p_deg + 1, pts))
         E[:, i * p_deg - 1 : (i + 1) * p_deg] = np.eye(p_deg + 1)
         # Add to Lu
-        Lu += np.dot(E.T, D.T).dot(dX).dot(W).dot(J).dot(dX).dot(D).dot(E).dot(u)
+        Lu += np.dot(E.T, D.T.dot(dX*W.dot(J*dX*D.dot(E.dot(u)))))
 
     return Lu
 
@@ -171,7 +171,7 @@ for p_deg in range(2, 5):
             # Build E
             E = np.zeros((p_deg + 1, pts))
             E[:, i * p_deg - 1: (i + 1) * p_deg] = np.eye(p_deg + 1)
-            Mf += np.dot(E.T, B.T).dot(W).dot(J).dot(f((q + 1) / dX + h * i))
+            Mf += np.dot(E.T, B.T.dot(W.dot(J*f((q + 1) / dX + h * i))))
 
         # Iterate to solution
         # Conjugate gradient
