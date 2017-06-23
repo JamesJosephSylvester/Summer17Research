@@ -155,20 +155,20 @@ for p_deg in range(2, 5):
         E = np.zeros((p_deg, pts))
         E[:, :p_deg] = np.eye(p_deg)
         # Add to Mf
-        Mf = np.dot(E.T, B[:, 1:].T).dot(W).dot(J).dot(np.diag(f((q + 1) / dX))).dot(B[:, 1:]).dot(E).dot(np.ones(pts))
+        Mf = np.dot(E.T, B[:, 1:].T).dot(W).dot(J).dot(f((q + 1) / dX))
         # Right
         # Build E
         E = np.zeros((p_deg, pts))
         E[:, -p_deg:] = np.eye(p_deg)
         # Add to Mf
-        Mf += np.dot(E.T, B[:, :-1].T).dot(W).dot(J).dot(np.diag(f((q + 1) / dX + h * (n - 1)))).dot(B[:, :-1]).dot(E).dot(np.ones(pts))
+        Mf += np.dot(E.T, B[:, :-1].T).dot(W).dot(J).dot(f((q + 1) / dX + h * (n - 1)))
 
         # Interior
         for i in range(1, n - 1):
             # Build E
             E = np.zeros((p_deg + 1, pts))
             E[:, i * p_deg - 1: (i + 1) * p_deg] = np.eye(p_deg + 1)
-            Mf += np.dot(E.T, B.T).dot(W).dot(J).dot(np.diag(f((q + 1) / dX + h * i))).dot(B).dot(E).dot(np.ones(pts))
+            Mf += np.dot(E.T, B.T).dot(W).dot(J).dot(f((q + 1) / dX + h * i))
 
         # Iterate to solution
         # Conjugate gradient
