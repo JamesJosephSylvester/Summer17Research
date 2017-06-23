@@ -207,8 +207,10 @@ for p_deg in range(2, 5):
         run_delx[p_deg, int(n / 10)] = h / (p_deg + 1)
 
 # Plot
+symbols = iter(['o', '^', 's', '*'])
 for p_deg in range(2, 5):
-    plt.loglog(run_delx[p_deg, :], run_errs[p_deg, :], label = 'p = '+str(p_deg))
+    plt.loglog(run_delx[p_deg, :], run_errs[p_deg, :], next(symbols), label = 'p = '+str(p_deg))
+    plt.loglog(run_delx[p_deg, :], run_delx[p_deg, :]**(p_deg+1), label='$h^{%d}$'%(p_deg+1))
 plt.legend()
 plt.xlabel('dx')
 plt.ylabel('||error||')
