@@ -123,10 +123,13 @@ run_delx = run_errs.copy()
 
 q_deg = 8       # degree of quadrature
 def f(x):       # forcing function
-    return (18 * np.pi**2 - 36 * np.pi * x + 12 * x**2) / 500
+    #return (18 * np.pi**2 - 36 * np.pi * x + 12 * x**2) / 500
+    from numpy import tanh, sin, cos
+    return (2*(tanh(x)**2 - 1)*sin(x)*tanh(x) - 2*(tanh(x)**2 - 1)*cos(x) - sin(x)*tanh(x))
 
 def f_true(x):  # true function
-    return (x**2 * (x - 3 * np.pi)**2) / 500
+    #return (x**2 * (x - 3 * np.pi)**2) / 500
+    return np.tanh(x)*np.sin(x)
 
 # Run FE with different p_deg, n
 for p_deg in range(2, 5):
