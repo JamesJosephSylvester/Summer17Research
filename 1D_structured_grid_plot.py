@@ -196,7 +196,7 @@ for p_deg in range(2, 5):
             p_old = p_new.copy()
 
         # Calculate error
-        x_vals = np.linspace(I[0] + h / (p_deg + 1), I[1] - h / (p_deg + 1), pts)
+        x_vals = np.linspace(I[0] + h / p_deg, I[1] - h / p_deg, pts)
         u_true = f_true(x_vals)
         norm = np.max(np.abs(u_true - u_new))
 

@@ -193,7 +193,7 @@ if itr == 10*pts:
 
 # Plot
 import matplotlib.pyplot as plt
-x_vals = np.linspace(I[0] + h / (p_deg + 1), I[1] - h / (p_deg + 1), pts)
+x_vals = np.linspace(I[0] + h / p_deg, I[1] - h / p_deg, pts)
 u_true = - f(x_vals)
 plt.plot(x_vals, u_true)
 plt.plot(x_vals, u_new)
