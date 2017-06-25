@@ -51,27 +51,9 @@ def apply_M(u):
     # Setup
     Mu = np.zeros(pts)
 
-    # Boundaries
-    # Left
-    # Build E
-    E = np.zeros((p_deg, pts))
-    E[:, :p_deg] = np.eye(p_deg)
-    # Add to Mu
-    Mu = np.dot(E.T, B[:, 1:].T).dot(W).dot(J).dot(B[:, 1:]).dot(E).dot(u)
-    # Right
-    # Build E
-    E = np.zeros((p_deg, pts))
-    E[:, -p_deg:] = np.eye(p_deg)
-    # Add to Mu
-    Mu += np.dot(E.T, B[:, :-1].T).dot(W).dot(J).dot(B[:, :-1]).dot(E).dot(u)
-    # Interior
-    for i in range(1, n - 1):
-        # Build E
-        E = np.zeros((p_deg + 1, pts))
-
-        E[:, i * p_deg - 1 : (i + 1) * p_deg] = np.eye(p_deg + 1)
+    for i in range(n):
         # Add to Mu
-        Mu += np.dot(E.T, B.T).dot(W).dot(J).dot(B).dot(E).dot(u)
+        Mu[i * p_deg: (i + 1) * p_deg + 1] += np.dot(B.T, J * W.dot(B.dot(u[i * p_deg: (i + 1) * p_deg + 1])))
 
     return Mu
 
@@ -90,27 +72,9 @@ def apply_L(u):
     # Setup
     Lu = np.zeros(pts)
 
-    # Boundaries
-    # Left
-    # Build E
-    E = np.zeros((p_deg, pts))
-    E[:, :p_deg] = np.eye(p_deg)
-    # Add to Lu
-    Lu = np.dot(E.T, D[:, 1:].T).dot(dX).dot(W).dot(J).dot(dX).dot(D[:, 1:]).dot(E).dot(u)
-    # Right
-    # Build E
-    E = np.zeros((p_deg, pts))
-    E[:, -p_deg:] = np.eye(p_deg)
-    # Add to Lu
-    Lu += np.dot(E.T, D[:, :-1].T).dot(dX).dot(W).dot(J).dot(dX).dot(D[:, :-1]).dot(E).dot(u)
-
-    # Interior
-    for i in range(1, n - 1):
-        # Build E
-        E = np.zeros((p_deg + 1, pts))
-        E[:, i * p_deg - 1 : (i + 1) * p_deg] = np.eye(p_deg + 1)
+    for i in range(n):
         # Add to Lu
-        Lu += np.dot(E.T, D.T.dot(dX*W.dot(J*dX*D.dot(E.dot(u)))))
+        Lu[i * p_deg: (i + 1) * p_deg + 1] += np.dot(D.T, dX * W.dot(J * dX * D.dot(u[i * p_deg: (i + 1) * p_deg + 1])))
 
     return Lu
 
@@ -118,8 +82,9 @@ def apply_L(u):
 # Setup
 import numpy as np
 import matplotlib.pyplot as plt
-p_degs = range(2, 7)
-run_errs = np.zeros((max(p_degs)+1, 7))
+
+p_degs = range(1, 7)
+run_errs = np.zeros((max(p_degs) + 1, 10))
 run_delx = run_errs.copy()
 
 q_deg = 8       # degree of quadrature
@@ -136,7 +101,7 @@ def f_true(x):  # true function
 for p_deg in p_degs:
     for n in range(10, 70, 10):
         # Setup
-        pts = n * (p_deg + 1) - (n - 1) - 2 # number of points
+        pts = n * (p_deg + 1) - (n - 1)     # number of points
 
         I = [0, 3 * np.pi]                  # interval
         h = (I[1] - I[0]) / n               # element width
@@ -153,45 +118,33 @@ for p_deg in p_degs:
         J = h / 2
 
         # Build Load Vector
+        Mf = np.zeros(pts)
 
-        # Boundaries
-        # Left
-        E = np.zeros((p_deg, pts))
-        E[:, :p_deg] = np.eye(p_deg)
-        # Add to Mf
-        Mf = np.dot(E.T, B[:, 1:].T).dot(W).dot(J).dot(f((q + 1) / dX))
-        # Right
-        # Build E
-        E = np.zeros((p_deg, pts))
-        E[:, -p_deg:] = np.eye(p_deg)
-        # Add to Mf
-        Mf += np.dot(E.T, B[:, :-1].T).dot(W).dot(J).dot(f((q + 1) / dX + h * (n - 1)))
-
-        # Interior
-        for i in range(1, n - 1):
-            # Build E
-            E = np.zeros((p_deg + 1, pts))
-            E[:, i * p_deg - 1: (i + 1) * p_deg] = np.eye(p_deg + 1)
-            Mf += np.dot(E.T, B.T.dot(W.dot(J*f((q + 1) / dX + h * i))))
+        for i in range(n):
+            Mf[i * p_deg: (i + 1) * p_deg + 1] += np.dot(B.T, J * W.dot(f((q + 1) / dX + h * i)))
 
         # Iterate to solution
         # Conjugate gradient
         u_old = np.array(np.random.rand(pts))
-        r_old = Mf - (-apply_L(u_old))
+        u_old[0] = 0
+        u_old[-1] = 0
+        r_old = np.zeros(pts)
+        r_old[1: -1] = Mf[1: -1] - (-apply_L(u_old)[1: -1])
         p_old = r_old.copy()
+        r_new = r_old.copy()
         norm = 1
         itr = 1
 
-        while norm > 10**-16 and itr < 10*pts:
+        while norm > 10 ** -16 and itr < 10 * pts:
             # Calculate new values
-            a = np.dot(r_old.T, r_old) / np.dot(p_old.T, (-apply_L(p_old)))
+            a = np.dot(r_old.T, r_old) / np.dot(p_old.T[1: -1], (-apply_L(p_old)[1: -1]))
             u_new = u_old + a * p_old
-            r_new = r_old - a * (-apply_L(p_old))
+            r_new[1: -1] = r_old[1: -1] - a * (-apply_L(p_old)[1: -1])
             b = np.dot(r_new.T, r_new) / np.dot(r_old.T, r_old)
             p_new = r_new + b * p_old
 
             # Calculate error
-            norm = np.abs(np.max(r_new))
+            norm = np.max(np.abs(r_new))
 
             # Prepate for next iteration
             itr += 1
@@ -200,12 +153,12 @@ for p_deg in p_degs:
             p_old = p_new.copy()
 
         # Calculate error
-        x_vals = np.linspace(I[0] + h / p_deg, I[1] - h / p_deg, pts)
+        x_vals = np.linspace(I[0], I[1], pts)
         u_true = f_true(x_vals)
         norm = np.max(np.abs(u_true - u_new))
 
         run_errs[p_deg, int(n / 10)] = norm
-        run_delx[p_deg, int(n / 10)] = h / (p_deg + 1)
+        run_delx[p_deg, int(n / 10)] = h / p_deg
 
 # Plot
 symbols = iter(['o', '^', 's', '*', '>', '+'])

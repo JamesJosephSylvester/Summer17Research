@@ -1,7 +1,7 @@
 def element_setup(p_deg, q_deg):
     # Inputs:
     #       p_deg - degree of shape functions
-    #       q _deg- degree of quadrature
+    #       q_deg - degree of quadrature
 
     # Outputs:
     #       B - mass matrix component
@@ -42,7 +42,7 @@ def element_setup(p_deg, q_deg):
 
 
 # Check Output
-B, D, q, W = element_setup(2, 2)
+B, D, q, W = element_setup(2, 100)
 
 print("q")
 print(q)
@@ -62,3 +62,13 @@ print(np.matmul(B.T, np.matmul(W, B)))
 
 print("D' W D")
 print(np.matmul(D.T, np.matmul(W, D)))
+
+# Plots
+import matplotlib.pyplot as plt
+for i in range(3):
+    plt.plot(q, B[:, i])
+plt.show()
+
+for i in range(3):
+    plt.plot(q, D[:, i])
+plt.show()
