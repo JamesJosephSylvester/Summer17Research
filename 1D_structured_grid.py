@@ -15,6 +15,8 @@ def element_setup():
 
     # B, D matrices
     node = np.linspace(-1, 1, p_deg + 1)
+    poly = np.polynomial.legendre.Legendre.basis(p_deg, [-1, 1]).deriv(1)
+    node[1 : -1] = poly.roots()
 
     # B
     B = np.array(
@@ -83,9 +85,9 @@ def apply_L(u):
 # Setup
 import numpy as np
 
-p_deg = 3                           # degree of shape functions
+p_deg = 4                           # degree of shape functions
 q_deg = 5                           # degree of quadrature
-n = 5                               # number of elements
+n = 7                               # number of elements
 pts = n * (p_deg + 1) - (n - 1)     # number of points
 
 I = [0, np.pi]                      # interval
@@ -107,7 +109,7 @@ J = h / 2
 
 # Build Load Vector
 Mf = np.zeros(pts)
-# Interior
+# Iterate
 for i in range(n):
     Mf[i * p_deg : (i + 1) * p_deg + 1] += np.dot(B.T, J*W.dot(f((q + 1) / dX + h * i)))
 
@@ -145,8 +147,19 @@ if itr == 10*pts:
 
 # Plot
 import matplotlib.pyplot as plt
+
 x_vals = np.linspace(I[0], I[1], pts)
+poly = np.polynomial.legendre.Legendre.basis(p_deg, [-1, 1]).deriv(1)
+for i in range(n):
+    x_vals[i * p_deg + 1: (i + 1) * p_deg] = (poly.roots() + 1) * J + h * i
 u_true = - f(x_vals)
-plt.plot(x_vals, u_true)
-plt.plot(x_vals, u_new)
+
+plt.plot(x_vals, u_true, label = 'True Solution')
+plt.plot(x_vals, u_new, label = 'Caluclated Solution')
+plt.legend()
+plt.xlabel('x')
+plt.ylabel('u')
+plt.title('Calculated vs True')
 plt.show()
+
+print('Inf Norm: ' + str(np.max(np.abs(u_true - u_new))))

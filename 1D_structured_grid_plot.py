@@ -15,6 +15,8 @@ def element_setup():
 
     # B, D matrices
     node = np.linspace(-1, 1, p_deg + 1)
+    poly = np.polynomial.legendre.Legendre.basis(p_deg, [-1, 1]).deriv(1)
+    node[1 : -1] = poly.roots()
 
     # B
     B = np.array(
@@ -154,6 +156,10 @@ for p_deg in p_degs:
 
         # Calculate error
         x_vals = np.linspace(I[0], I[1], pts)
+        poly = np.polynomial.legendre.Legendre.basis(p_deg, [-1, 1]).deriv(1)
+        for i in range(n):
+            x_vals[i * p_deg + 1: (i + 1) * p_deg] = (poly.roots() + 1) * J + h * i
+
         u_true = f_true(x_vals)
         norm = np.max(np.abs(u_true - u_new))
 
