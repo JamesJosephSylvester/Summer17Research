@@ -14,26 +14,26 @@ def element_setup():
     W = np.diag(w)
 
     # B, D matrices
-    node = np.linspace(-1, 1, p_deg + 1)
+    nodes = np.linspace(-1, 1, p_deg + 1)
     poly = np.polynomial.legendre.Legendre.basis(p_deg, [-1, 1]).deriv(1)
-    node[1 : -1] = poly.roots()
+    nodes[1 : -1] = poly.roots()
 
     # B
     B = np.array(
-        [np.prod([(q - node[j])/(node[i] - node[j]) for j in range(p_deg + 1) if j != i], 0)
+        [np.prod([(q - nodes[j])/(nodes[i] - nodes[j]) for j in range(p_deg + 1) if j != i], 0)
          for i in range(p_deg + 1)])
 
     # D
     if p_deg == 1:
         D = np.array(
-            [np.prod([(q - node[j]) / (node[i] - node[j]) for j in range(p_deg + 1) if j != i], 0)
-             *np.sum([1/(q - node[j]) for j in range(p_deg + 1) if j != i], 0)
+            [np.prod([(q - nodes[j]) / (nodes[i] - nodes[j]) for j in range(p_deg + 1) if j != i], 0)
+             *np.sum([1/(q - nodes[j]) for j in range(p_deg + 1) if j != i], 0)
              for i in range(p_deg + 1)])
         # Smaller expression, but does not allow for odd deg of quadrature
     else:
         D = np.array(
-            [np.sum([np.prod([(q - node[j]) / (node[i] - node[j]) for j in range(p_deg + 1) if j != i and j != k], 0)
-                      / (node[i] - node[k])
+            [np.sum([np.prod([(q - nodes[j]) / (nodes[i] - nodes[j]) for j in range(p_deg + 1) if j != i and j != k], 0)
+                      / (nodes[i] - nodes[k])
              for k in range(p_deg + 1) if k != i], 0)
              for i in range(p_deg + 1)])
 
@@ -80,16 +80,52 @@ def apply_L(u):
 
     return Lu
 
+def apply_LHS(u):
+    # Apply Operators
+    u_return = -apply_L(u)
+
+    return u_return
+
+def apply_bc(u):
+    # Setup Boundaries
+    u_return = u_boundary.copy()
+
+    # Apply Operators
+    u_return[1 : -1] = u[1 : -1]
+
+    return u_return
+
+def apply_zero_bc(u):
+    # Setup Boundaries
+    u_return = np.zeros(pts)
+
+    # Apply Operators
+    u_return[1 : -1] = u[1 : -1]
+
+    return u_return
+
+def get_bc(u):
+    # Setup Boundaries
+    u_return = np.zeros(pts)
+
+    # Apply Operators
+    u_return[0] = u[0]
+    u_return[-1] = u[-1]
+
+    return u_return
+
+
 # Main Code
 # Setup
 import numpy as np
 import matplotlib.pyplot as plt
 
-p_degs = range(1, 7)
+p_degs = range(1, 6)
 run_errs = np.zeros((max(p_degs) + 1, 10))
 run_delx = run_errs.copy()
 
-q_deg = 8       # degree of quadrature
+q_deg = 8                           # degree of quadrature
+
 def f(x):       # forcing function
     #return (18 * np.pi**2 - 36 * np.pi * x + 12 * x**2) / 500
     from numpy import tanh, sin, cos
@@ -97,16 +133,21 @@ def f(x):       # forcing function
 
 def f_true(x):  # true function
     #return (x**2 * (x - 3 * np.pi)**2) / 500
-    return np.tanh(x)*np.sin(x)
+    return np.tanh(x)*np.sin(x) + x
 
 # Run FE with different p_deg, n
 for p_deg in p_degs:
+    print(p_deg)
     for n in range(10, 70, 10):
         # Setup
         pts = n * (p_deg + 1) - (n - 1)     # number of points
 
         I = [0, 3 * np.pi]                  # interval
         h = (I[1] - I[0]) / n               # element width
+
+        u_boundary = np.zeros(pts)  # boundary
+        u_boundary[0] = 0
+        u_boundary[-1] = I[1]
 
         # Setup Element
         B, D, q, W = element_setup()
@@ -127,28 +168,28 @@ for p_deg in p_degs:
 
         # Iterate to solution
         # Conjugate gradient
-        u_old = np.array(np.random.rand(pts))
-        u_old[0] = 0
-        u_old[-1] = 0
-        r_old = np.zeros(pts)
-        r_old[1: -1] = Mf[1: -1] - (-apply_L(u_old)[1: -1])
+        u_old = np.random.rand(pts)
+        u_old = apply_bc(u_old)
+        r_temp = Mf - apply_LHS(apply_bc(u_old))
+        r_old = apply_zero_bc(r_temp) + (get_bc(u_old) - u_boundary)
         p_old = r_old.copy()
         r_new = r_old.copy()
         norm = 1
         itr = 1
 
-        while norm > 10 ** -16 and itr < 10 * pts:
+        while norm > 10 ** -16 and itr < 20 * pts:
             # Calculate new values
-            a = np.dot(r_old.T, r_old) / np.dot(p_old.T[1: -1], (-apply_L(p_old)[1: -1]))
+            a = np.dot(r_old.T, r_old) / np.dot(p_old.T, apply_LHS(p_old))
             u_new = u_old + a * p_old
-            r_new[1: -1] = r_old[1: -1] - a * (-apply_L(p_old)[1: -1])
+            r_temp = Mf - apply_LHS(apply_bc(u_new))
+            r_new = apply_zero_bc(r_temp) + (get_bc(u_old) - u_boundary)
             b = np.dot(r_new.T, r_new) / np.dot(r_old.T, r_old)
             p_new = r_new + b * p_old
 
             # Calculate error
             norm = np.max(np.abs(r_new))
 
-            # Prepate for next iteration
+            # Prepare for next iteration
             itr += 1
             u_old = u_new.copy()
             r_old = r_new.copy()
@@ -184,4 +225,5 @@ plt.legend()
 plt.xlabel('x')
 plt.ylabel('u')
 plt.title('Calculated vs True')
+plt.axis([I[0], I[1], 1.05 * np.min(u_true), 1.05 * np.max(u_true)])
 plt.show()

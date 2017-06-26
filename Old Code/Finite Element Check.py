@@ -81,7 +81,7 @@ def force(x, y):
 
 # Integrate
 def integrate(element, x_0, y_0, hx, hy):
-    deg = 128
+    deg = 11
     vals, wgts = numpy.polynomial.legendre.leggauss(deg)
     shift_vals = (vals + 1)*hy + (y_0 - hy)
     integral = 0
