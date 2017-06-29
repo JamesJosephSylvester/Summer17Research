@@ -90,7 +90,8 @@ def apply_L(u):
         u_extract = elmt_extract(u, i)
 
         # Calculate Lu on element
-        elmt_result = np.dot((Dx.T + Dy.T), dX*W.dot(J*dX*(Dx + Dy).dot(u_extract)))
+        elmt_result = np.dot(Dx.T, dX*W.dot(J*dX*Dx.dot(u_extract)))
+        elmt_result += np.dot(Dy.T, dX*W.dot(J*dX*Dy.dot(u_extract)))
 
         # Insert Result
         Lu += elmt_insert(elmt_result, i)
@@ -104,7 +105,7 @@ def apply_L(u):
 
 def apply_LHS(u):
     # Apply Operators
-    u_return = -apply_L(u)
+    u_return = apply_M(u)
 
     return u_return
 
@@ -159,7 +160,7 @@ def elmt_insert(u_e, elmt):
 
     # Loop through Columns
     for i in range(p_deg + 1):
-        u_return[start + i * pts_x : start + i * pts_x + p_deg + 1] = u_e[i * p_deg : (i + 1) * p_deg + 1]
+        u_return[start + i * pts_x : start + i * pts_x + p_deg + 1] = u_e[i * (p_deg + 1) : (i + 1) * (p_deg + 1)]
 
     return u_return
 
@@ -168,9 +169,9 @@ def elmt_insert(u_e, elmt):
 # Setup
 import numpy as np
 
-p_deg = 5                               # degree of shape functions
-q_deg = 7                               # degree of quadrature
-nx = 5                                  # number of elements in x
+p_deg = 8                               # degree of shape functions
+q_deg = 11                              # degree of quadrature
+nx = 4                                  # number of elements in x
 n = nx * nx                             # number of elements
 pts_x = nx * (p_deg + 1) - (nx - 1)     # number of points in x
 pts = pts_x ** 2                        # number of points
@@ -183,17 +184,17 @@ u_boundary = np.zeros(pts)              # boundary
 
 def f(x, y):                            # forcing function
     from numpy import tanh, sin, cos
-    return -2*sin(x)*sin(y)
+    return sin(2*x) * sin(y)
 
 def f_true(x, y):                       # true function
-    return np.sin(x) * np.sin(y)
+    return np.sin(2*x) * np.sin(y)
 
 # Setup Element
 B, D, q, W = element_setup()
-W  = np.kron(W, W)
+W = np.kron(W, W)
 Dx = np.kron(D, B)
 Dy = np.kron(B, D)
-B  = np.kron(B, B)
+B = np.kron(B, B)
 
 # Build J, (dX/dx)
 # 1D uniform grid
@@ -213,8 +214,8 @@ for i in range(n):
     col_off = int(np.floor(i / nx))
     row_off = int(np.mod(i, nx))
 
-    x = (q + 1) / dX + h * col_off
-    y = (q + 1) / dX + h * row_off
+    x = (q + 1) / dX + h * row_off
+    y = (q + 1) / dX + h * col_off
     X, Y = np.meshgrid(x, y)
     f_vals = f(X, Y)
 
@@ -273,6 +274,16 @@ plt.show()
 
 # Calculate error
 u_true = f_true(X, Y).reshape(pts)
+
+plt.contourf(X, Y, u_true.reshape(pts_x, pts_x))
+plt.show()
+
 print('Inf Norm: ' + str(np.max(np.abs(u_true - u_new))))
 
-print(np.max(np.abs(apply_LHS(u_true) - Mf)))
+print(np.max(np.abs(apply_LHS(u_true)) - Mf))
+
+plt.contourf(X, Y, apply_LHS(u_true).reshape(pts_x, pts_x))
+plt.show()
+
+plt.contourf(X, Y, Mf.reshape(pts_x, pts_x))
+plt.show()

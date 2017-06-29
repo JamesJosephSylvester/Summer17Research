@@ -42,7 +42,7 @@ def element_setup(p_deg, q_deg):
 
 
 # Check Output
-B, D, q, W = element_setup(2, 100)
+B, D, q, W = element_setup(2, 4)
 
 print("q")
 print(q)
@@ -72,3 +72,8 @@ plt.show()
 for i in range(3):
     plt.plot(q, D[:, i])
 plt.show()
+
+Dx = np.kron(B, D)
+Dy = np.kron(D, B)
+W = np.kron(W, W)
+print(np.matmul(Dx.T, np.matmul(W, Dx)) + np.matmul(Dy.T, np.matmul(W, Dy)))
