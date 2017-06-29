@@ -54,8 +54,19 @@ def apply_M(u):
     Mu = np.zeros(pts)
 
     for i in range(n):
-        # Add to Mu
-        Mu[i * p_deg : (i + 1) * p_deg + 1] += np.dot(B.T, J*W.dot(B.dot(u[i * p_deg : (i + 1) * p_deg + 1])))
+        # Setup
+        u_extract = elmt_extract(u, i)
+
+        # Calculate Mu on element
+        elmt_result = np.dot(B.T, J * W.dot(B.dot(u_extract)))
+
+        # Insert Result
+        Mu += elmt_insert(elmt_result, i)
+
+    # 1D Code
+    #for i in range(n):
+    #    # Add to Mu
+    #    Mu[i * p_deg : (i + 1) * p_deg + 1] += np.dot(B.T, J*W.dot(B.dot(u[i * p_deg : (i + 1) * p_deg + 1])))
 
     return Mu
 
@@ -75,8 +86,19 @@ def apply_L(u):
     Lu = np.zeros(pts)
 
     for i in range(n):
-        # Add to Lu
-        Lu[i * p_deg : (i + 1) * p_deg + 1] += np.dot(D.T, dX*W.dot(J*dX*D.dot(u[i * p_deg : (i + 1) * p_deg + 1])))
+        # Setup
+        u_extract = elmt_extract(u, i)
+
+        # Calculate Lu on element
+        elmt_result = np.dot((Dx.T + Dy.T), dX*W.dot(J*dX*(Dx + Dy).dot(u_extract)))
+
+        # Insert Result
+        Lu += elmt_insert(elmt_result, i)
+
+    # 1D Code
+    #for i in range(n):
+    #    # Add to Lu
+    #    Lu[i * p_deg : (i + 1) * p_deg + 1] += np.dot(D.T, dX*W.dot(J*dX*D.dot(u[i * p_deg : (i + 1) * p_deg + 1])))
 
     return Lu
 
@@ -91,7 +113,8 @@ def apply_bc(u):
     u_return = u_boundary.copy()
 
     # Fill Interior
-    u_return[1 : -1] = u[1 : -1]
+    for i in range(1, pts_x - 1):
+        u_return[i * pts_x + 1 : (i + 1) * pts_x - 1] = u[i * pts_x + 1: (i + 1) * pts_x - 1]
 
     return u_return
 
@@ -100,63 +123,104 @@ def apply_zero_bc(u):
     u_return = np.zeros(pts)
 
     # Fill Interior
-    u_return[1 : -1] = u[1 : -1]
+    for i in range(1, pts_x - 1):
+        u_return[i * pts_x + 1 : (i + 1) * pts_x - 1] = u[i * pts_x + 1 : (i + 1) * pts_x - 1]
 
     return u_return
 
 def get_bc(u):
-    # Setup Interior
-    u_return = np.zeros(pts)
+    # Setup Boundaries
+    u_return = u.copy()
 
-    # Get Boundries
-    u_return[0] = u[0]
-    u_return[-1] = u[-1]
+    # Fill Interior
+    for i in range(1, pts_x - 1):
+        u_return[i * pts_x + 1 : (i + 1) * pts_x - 1] = np.zeros(pts_x - 2)
 
     return u_return
 
+def elmt_extract(u, elmt):
+    # Setup
+    col_off = int(np.floor(elmt / nx))
+    row_off = int(np.mod(elmt, nx))
+    start = col_off * pts_x * p_deg + row_off * p_deg
+
+    # Extract
+    element = np.array([u[start + i * pts_x : start + i * pts_x + p_deg + 1] for i in range(p_deg + 1)])
+
+    return element.reshape((p_deg + 1) ** 2)
+
+def elmt_insert(u_e, elmt):
+    # Setup
+    u_return = np.zeros(pts)
+
+    col_off = int(np.floor(elmt / nx))
+    row_off = int(np.mod(elmt, nx))
+    start = col_off * pts_x * p_deg + row_off * p_deg
+
+    # Loop through Columns
+    for i in range(p_deg + 1):
+        u_return[start + i * pts_x : start + i * pts_x + p_deg + 1] = u_e[i * p_deg : (i + 1) * p_deg + 1]
+
+    return u_return
 
 # Main Code
 
 # Setup
 import numpy as np
 
-p_deg = 3                           # degree of shape functions
-q_deg = 9                           # degree of quadrature
-n = 15                              # number of elements
-pts = n * (p_deg + 1) - (n - 1)     # number of points
+p_deg = 5                               # degree of shape functions
+q_deg = 7                               # degree of quadrature
+nx = 5                                  # number of elements in x
+n = nx * nx                             # number of elements
+pts_x = nx * (p_deg + 1) - (nx - 1)     # number of points in x
+pts = pts_x ** 2                        # number of points
 
-I = [0, 2 * np.pi]                  # interval
-h = (I[1] - I[0]) / n               # element width
+I_x = [0, 2 * np.pi]                    # interval
+I_y = [0, 2 * np.pi]                    # interval
+h = (I_x[1] - I_x[0]) / nx              # element width
 
-u_boundary = np.zeros(pts)          # boundary
-u_boundary[0] = 0
-u_boundary[-1] = I[1]
+u_boundary = np.zeros(pts)              # boundary
 
-def f(x):                           # forcing function
-    #from numpy import tanh, sin, cos, cosh
-    #return (-4*sin(2*x)*tanh(x) + 4*cos(2*x)/cosh(x)**2 - 2*sin(2*x)*tanh(x)/cosh(x)**2) + (tanh(x)*np.sin(2*x) + x)
-    return - np.sin(x)
+def f(x, y):                            # forcing function
+    from numpy import tanh, sin, cos
+    return -2*sin(x)*sin(y)
 
-def f_true(x):                      # true function
-    # return np.tanh(x)*np.sin(2*x) + x
-    return np.sin(x) + x
+def f_true(x, y):                       # true function
+    return np.sin(x) * np.sin(y)
 
 # Setup Element
 B, D, q, W = element_setup()
+W  = np.kron(W, W)
+Dx = np.kron(D, B)
+Dy = np.kron(B, D)
+B  = np.kron(B, B)
 
 # Build J, (dX/dx)
 # 1D uniform grid
 # x = (X + 1) * h / 2 + a
+# y = (Y + 1) * h / 2 + a
 # dx/dX = h / 2
-# |J| = h / 2
+# dy/dY = h / 2
+# |J| = h**2 / 4
 dX = 2 / h
-J = h / 2
+J = h ** 2 / 4
 
 # Build Load Vector
 Mf = np.zeros(pts)
+
 # Iterate
 for i in range(n):
-    Mf[i * p_deg : (i + 1) * p_deg + 1] += np.dot(B.T, J*W.dot(f((q + 1) / dX + h * i)))
+    col_off = int(np.floor(i / nx))
+    row_off = int(np.mod(i, nx))
+
+    x = (q + 1) / dX + h * col_off
+    y = (q + 1) / dX + h * row_off
+    X, Y = np.meshgrid(x, y)
+    f_vals = f(X, Y)
+
+    element_Mf = np.dot(B.T, J*W.dot(f_vals.reshape((q_deg ** 2)).T))
+
+    Mf += elmt_insert(element_Mf, i)
 
 # Iterate to solution
 # Conjugate gradient
@@ -171,7 +235,9 @@ p_old = r_old.copy()
 norm = 1
 itr = 1
 
-while norm > 10**-16 and itr < 100*pts:
+max_itr = 10*pts
+
+while norm > 10**-16 and itr < max_itr:
     # Calculate new values
     a = np.dot(r_old.T, r_old) / np.dot(p_old.T, apply_LHS(p_old))
     u_new = u_old + a * p_old
@@ -191,26 +257,22 @@ while norm > 10**-16 and itr < 100*pts:
     r_old = r_new.copy()
     p_old = p_new.copy()
 
-if itr == 100*pts:
+if itr == max_itr:
     print('max itr reached')
 
 # Plot
 import matplotlib.pyplot as plt
 
-x_vals = np.linspace(I[0], I[1], pts)
+x_vals = np.linspace(I_x[0], I_x[1], pts_x)
 poly = np.polynomial.legendre.Legendre.basis(p_deg, [-1, 1]).deriv(1)
-for i in range(n):
-    x_vals[i * p_deg + 1: (i + 1) * p_deg] = (poly.roots() + 1) * J + h * i
-u_true = f_true(x_vals)
-
-plt.plot(x_vals, u_true, label = 'True Solution')
-plt.plot(x_vals, u_new, label = 'Calculated Solution')
-plt.legend()
-plt.xlabel('x')
-plt.ylabel('u')
-plt.title('Calculated vs True')
-y_range = [min(1.05 * np.min(u_true), 0.95 * np.min(u_true)), max(1.05 * np.max(u_true), 0.95 * np.max(u_true))]
-plt.axis(np.concatenate((I, y_range), 0))
+for i in range(nx):
+    x_vals[i * p_deg + 1 : (i + 1) * p_deg] = (poly.roots() + 1) * J + h * i
+X, Y = np.meshgrid(x_vals, x_vals)
+plt.contourf(X, Y, u_new.reshape(pts_x, pts_x))
 plt.show()
 
+# Calculate error
+u_true = f_true(X, Y).reshape(pts)
 print('Inf Norm: ' + str(np.max(np.abs(u_true - u_new))))
+
+print(np.max(np.abs(apply_LHS(u_true) - Mf)))
