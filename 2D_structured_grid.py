@@ -183,10 +183,10 @@ h = (I_x[1] - I_x[0]) / nx              # element width
 
 def f(x, y):                            # forcing function
     from numpy import tanh, sin, cos
-    return - 2 * sin(x) * sin(y)
+    return - 5 * sin(2 * x) * sin(y)
 
 def f_true(x, y):                       # true function
-    return np.sin(x) * np.sin(y) + x + y
+    return np.sin(2 * x) * np.sin(y) + x + y
 
 # Setup Element
 B, D, q, W = element_setup()
@@ -234,7 +234,6 @@ for i in range(n):
 # Iterate to solution
 # Conjugate gradient
 u = np.random.rand(pts)
-u = np.zeros(pts)
 u = apply_bc(u)
 
 r_temp = Mf - apply_LHS(apply_bc(u))
@@ -260,7 +259,7 @@ while norm > 10**-15 and itr < max_itr:
 
     # Calculate error
     norm = np.abs(np.max(r_new))
-    
+
     # Early exit conditions
     if norm > 5000:
         itr = max_itr - 1

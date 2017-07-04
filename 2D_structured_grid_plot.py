@@ -236,7 +236,6 @@ for p_deg in p_degs:
         # Iterate to solution
         # Conjugate gradient
         u = np.random.rand(pts)
-        u = np.zeros(pts)
         u = apply_bc(u)
 
         r_temp = Mf - apply_LHS(apply_bc(u))
