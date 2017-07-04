@@ -105,7 +105,7 @@ def apply_L(u):
 
 def apply_LHS(u):
     # Apply Operators
-    u_return = -apply_L(u)
+    u_return = apply_M(u)
 
     return u_return
 
@@ -170,7 +170,7 @@ def elmt_insert(u_e, elmt):
 # Setup
 import numpy as np
 
-p_deg = 6                               # degree of shape functions
+p_deg = 5                               # degree of shape functions
 q_deg = 10                              # degree of quadrature
 nx = 4                                  # number of elements in x
 n = nx * nx                             # number of elements
@@ -185,7 +185,7 @@ u_boundary = np.zeros(pts)              # boundary
 
 def f(x, y):                            # forcing function
     from numpy import tanh, sin, cos
-    return - 5 * sin(2 * x) * sin(y)
+    return sin(2 * x) * sin(y)
 
 def f_true(x, y):                       # true function
     return np.sin(2 * x) * np.sin(y)
@@ -275,3 +275,5 @@ plt.show()
 # Calculate error
 u_true = f_true(X, Y).reshape(pts)
 print('Inf Norm: ' + str(np.max(np.abs(u_true - u))))
+
+print(np.max(np.abs(Mf - apply_LHS(u_true))))
