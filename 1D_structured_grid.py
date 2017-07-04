@@ -160,38 +160,38 @@ for i in range(n):
 
 # Iterate to solution
 # Conjugate gradient
-u_old = np.random.rand(pts)
-u_old = apply_bc(u_old)
+u = np.random.rand(pts)
+u = apply_bc(u)
 
-r_temp = Mf - apply_LHS(apply_bc(u_old))
-r_old = apply_zero_bc(r_temp) + (get_bc(u_old) - u_boundary)
+r_temp = Mf - apply_LHS(apply_bc(u))
+r_old = apply_zero_bc(r_temp) + (get_bc(u) - u_boundary)
 r_new = r_old.copy()
 
-p_old = r_old.copy()
+p = r_old.copy()
 norm = 1
 itr = 1
 
-while norm > 10**-16 and itr < 100*pts:
-    # Calculate new values
-    a = np.dot(r_old.T, r_old) / np.dot(p_old.T, apply_LHS(p_old))
-    u_new = u_old + a * p_old
+max_itr = 10*pts
 
-    r_temp = Mf - apply_LHS(apply_bc(u_new))
-    r_new = apply_zero_bc(r_temp) + (get_bc(u_old) - u_boundary)
+while norm > 10**-16 and itr < max_itr:
+    # Calculate new values
+    a = np.dot(r_old.T, r_old) / np.dot(p.T, apply_LHS(p))
+    u = u + a * p
+
+    r_temp = Mf - apply_LHS(apply_bc(u))
+    r_new = apply_zero_bc(r_temp) + (get_bc(u) - u_boundary)
 
     b = np.dot(r_new.T, r_new) / np.dot(r_old.T, r_old)
-    p_new = r_new + b * p_old
+    p = r_new + b * p
 
     # Calculate error
     norm = np.abs(np.max(r_new))
 
     # Prepare for next iteration
     itr += 1
-    u_old = u_new.copy()
     r_old = r_new.copy()
-    p_old = p_new.copy()
 
-if itr == 100*pts:
+if itr == max_itr:
     print('max itr reached')
 
 # Plot
@@ -204,7 +204,7 @@ for i in range(n):
 u_true = f_true(x_vals)
 
 plt.plot(x_vals, u_true, label = 'True Solution')
-plt.plot(x_vals, u_new, label = 'Calculated Solution')
+plt.plot(x_vals, u, label = 'Calculated Solution')
 plt.legend()
 plt.xlabel('x')
 plt.ylabel('u')
@@ -213,4 +213,4 @@ y_range = [min(1.05 * np.min(u_true), 0.95 * np.min(u_true)), max(1.05 * np.max(
 plt.axis(np.concatenate((I, y_range), 0))
 plt.show()
 
-print('Inf Norm: ' + str(np.max(np.abs(u_true - u_new))))
+print('Inf Norm: ' + str(np.max(np.abs(u_true - u))))
