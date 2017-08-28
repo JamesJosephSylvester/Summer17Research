@@ -385,7 +385,7 @@ def fmg_solve(f_vec, levels, tol, op_mats, op_par, grid, bc):
         # Solve if coarsest
         if not i:
             # Level 0 solve
-            u = cg_solve(u, f_vecs[0], 10 * grids[0]['pts'], tol * 10 ** 3, op_mats_lin, op_pars[0], grids[0], bc_vecs[0])
+            u = cg_solve(u, f_vecs[0], 10 * grids[0]['pts'], tol ** 3, op_mats_lin, op_pars[0], grids[0], bc_vecs[0])
         # Otherwise restrict, V Cycle, and correct
         else:
             # Restrict
@@ -406,7 +406,7 @@ def fmg_solve(f_vec, levels, tol, op_mats, op_par, grid, bc):
     u = apply_bc(u, grid, bc)
 
     # Presmooth
-    for smooths in range(4 * smooths):
+    for smooths in range(3 * smooths):
         u = u - apply_zero_bc(omega * (apply_op(u, op_mats, op_par, grid) - f_vec), grid) * op_par['diag_lumped_inv']
 
     # Restrict
@@ -417,7 +417,7 @@ def fmg_solve(f_vec, levels, tol, op_mats, op_par, grid, bc):
     u = u + u_to_p(apply_zero_bc(u_new - u_restrict, grids[levels - 1]), op_mats, grid, grids[levels - 1])
 
     # Postmooth
-    for smooths in range(4 * smooths):
+    for smooths in range(3 * smooths):
         u = u - apply_zero_bc(omega * (apply_op(u, op_mats, op_par, grid) - f_vec), grid) * op_par['diag_lumped_inv']
 
     return u
@@ -693,52 +693,36 @@ u_true = fn_true(X, Y).reshape(pts)
 
 # Solvers
 max_itr = 10 * grid['pts']
-tol = 10 ** -12
+tol = 10 ** -3
 
-# Conjugate Gradient solve
-print('Conjugate Gradient')
-u_0 = np.random.rand(grid['pts'])
-tic = time.time()
-u_cg = cg_solve(u_0, f_vec, max_itr, tol, op_mats, op_par, grid, u_boundary)
-toc = time.time()
-cg_error = np.max(np.abs(u_true - u_cg))
-cg_time = toc - tic
-print('Inf Norm: ' + str(cg_error))
-print('Time: ' + str(cg_time))
 
 # FMG solve
+fmg_error = np.zeros(levels)
+fmg_time = np.zeros(levels)
 print('\n')
 print('Full Multigrid')
-tic = time.time()
-u_fmg = fmg_solve(f_vec, levels, tol * 10 ** 11, op_mats, op_par, grid, u_boundary)
-toc = time.time()
-fmg_error = np.max(np.abs(u_true - u_fmg))
-fmg_time = toc - tic
-print('Inf Norm: ' + str(fmg_error))
-print('Time: ' + str(fmg_time))
+for mg_levels in range(1, levels + 1):
+    print(str(mg_levels) + ' levels')
+    tic = time.time()
+    u_fmg = fmg_solve(f_vec, mg_levels, tol, op_mats, op_par, grid, u_boundary)
+    toc = time.time()
+    fmg_error[mg_levels - 1] = np.max(np.abs(u_true - u_fmg))
+    fmg_time[mg_levels - 1] = toc - tic
+    print('Inf Norm: ' + str(fmg_error[mg_levels - 1]))
+    print('Time: ' + str(fmg_time[mg_levels - 1]) + '\n')
 
 
 # Plot
-# Setup
-fig, axarr = plt.subplots(2, 2)
+fig, axarr = plt.subplots(1, 2)
 plt.rc('text', usetex=True)
 plt.rc('font', family='serif')
-plt.suptitle('CG vs FMG\np = %d, %d elements, %d levels' % (grid['p_deg'], grid['n'], levels), fontsize = 16)
-# CG Solution
-im = axarr[0, 0].contourf(X, Y, u_cg.reshape(grid['pts_x'], grid['pts_x']), cmap=plt.cm.jet)
-axarr[0, 0].title.set_text('CG Solution\n%02f sec' % cg_time)
-plt.colorbar(im, ax = axarr[0, 0])
-# FMG Solution
-im = axarr[0, 1].contourf(X, Y, u_fmg.reshape(grid['pts_x'], grid['pts_x']), cmap=plt.cm.jet)
-axarr[0, 1].title.set_text('FMG Solution\n%02f sec' % fmg_time)
-plt.colorbar(im, ax = axarr[0, 1])
-# CG Error
-im = axarr[1, 0].contourf(X, Y, (u_true - u_cg).reshape(grid['pts_x'], grid['pts_x']), cmap=plt.cm.jet)
-axarr[1, 0].title.set_text('CG Error\n$||error||_\infty =$ %02e' % cg_error)
-plt.colorbar(im, ax = axarr[1, 0])
-# FMG Error
-im = axarr[1, 1].contourf(X, Y, (u_true - u_fmg).reshape(grid['pts_x'], grid['pts_x']), cmap=plt.cm.jet)
-axarr[1, 1].title.set_text('FMG Error\n$||error||_\infty =$ %02e' % fmg_error)
-plt.colorbar(im, ax = axarr[1, 1])
+plt.suptitle('FMG Different Number of Grids\np = %d, %d elements' % (grid['p_deg'], grid['n']), fontsize = 16)
+# Error
+axarr[0].plot(range(1, levels + 1), fmg_error)
+axarr[0].title.set_text('FMG Error')
+# Time
+axarr[1].plot(range(1, levels + 1), fmg_time)
+axarr[1].title.set_text('FMG Time')
+
 # Show
 plt.show()
