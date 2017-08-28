@@ -43,7 +43,7 @@ def element_setup(p_deg, q_deg):
 
 # Setup computation
 def fn_forcing(x, y):                   # forcing function
-    return np.sin(2 * x) * np.sin(y) + x + y #- 5 * sin(2 * x) * sin(y)
+    return np.sin(2 * x) * np.sin(y) + x + y # - 5 * np.sin(2 * x) * np.sin(y)
 
 def fn_true(x, y):                      # true function
     return np.sin(2 * x) * np.sin(y) + x + y
@@ -345,7 +345,7 @@ def fmg_solve(f_vec, levels, tol, op_mats, op_par, grid, bc):
     #       u - solution of LHS(u) = f_vec
 
     # Setup
-    smooths = 3
+    smooths = 2
     omega = 2 / 3
     I = np.kron(np.array([[1, 0.5, 0], [0, 0.5, 1]]), np.array([[1, 0.5, 0], [0, 0.5, 1]])).T
 
@@ -406,7 +406,7 @@ def fmg_solve(f_vec, levels, tol, op_mats, op_par, grid, bc):
     u = apply_bc(u, grid, bc)
 
     # Presmooth
-    for smooths in range(3 * smooths):
+    for smooths in range(5 * smooths):
         u = u - apply_zero_bc(omega * (apply_op(u, op_mats, op_par, grid) - f_vec), grid) * op_par['diag_lumped_inv']
 
     # Restrict
@@ -417,7 +417,7 @@ def fmg_solve(f_vec, levels, tol, op_mats, op_par, grid, bc):
     u = u + u_to_p(apply_zero_bc(u_new - u_restrict, grids[levels - 1]), op_mats, grid, grids[levels - 1])
 
     # Postmooth
-    for smooths in range(3 * smooths):
+    for smooths in range(5 * smooths):
         u = u - apply_zero_bc(omega * (apply_op(u, op_mats, op_par, grid) - f_vec), grid) * op_par['diag_lumped_inv']
 
     return u
@@ -495,10 +495,20 @@ def u_to_p(u, op_mats, grid, grid_lin):
 
     # Loop
     for i in range(grid['n']):
+        # Extract
         extract = elmt_extract(u, i, grid_lin)
+
+        # Interpolate
         insert = np.matmul(I, extract)
+
+        # Zero right and bottom boundary
+        insert[0 : pts_side] = np.zeros(pts_side)
+        for j in range(2, pts_side + 1):
+            insert[j * pts_side - 1] = 0
+
+        # Insert
         insert = elmt_insert(insert, i, grid)
-        u_return = np.array([u_return[j] if u_return[j] else insert[j] for j in range(grid['pts'])])
+        u_return += insert
 
     return u_return
 
@@ -520,10 +530,15 @@ def u_to_lin(u, op_mats, grid, grid_lin):
 
     # Loop
     for i in range(grid['n']):
+        # Extract
         extract = elmt_extract(u, i, grid)
+
+        # Restrict
         insert = np.matmul(I.T, extract)
+
+        # Insert
         insert = elmt_insert(insert, i, grid_lin)
-        u_return = np.array([u_return[j] if u_return[j] else insert[j] for j in range(grid_lin['pts'])])
+        u_return += insert
 
     return u_return
 
@@ -570,14 +585,18 @@ def restrict_u(u, grid_fine, grid_coarse):
         col_off = int(np.mod(i, grid_coarse['n_x']))
         start = 2 * row_off * grid_fine['n_x'] + 2 * col_off
 
+        # Extract
         u_e0 = elmt_extract(u, start, grid_fine)
         u_e1 = elmt_extract(u, start + 1, grid_fine)
         u_e2 = elmt_extract(u, start + grid_fine['n_x'], grid_fine)
         u_e3 = elmt_extract(u, start + grid_fine['n_x'] + 1, grid_fine)
+
+        # Restrict
         insert = np.array([u_e0[0], u_e0[1], u_e1[1], u_e0[2], u_e0[3], u_e1[3], u_e2[2], u_e2[3], u_e3[3]])
         insert = np.matmul(grid_coarse['I'].T, insert)
-        insert = elmt_insert(insert, i, grid_coarse)
 
+        # Insert
+        insert = elmt_insert(insert, i, grid_coarse)
         u_return += insert
 
     return u_return
@@ -600,11 +619,20 @@ def prolongate_u(u, grid_fine, grid_coarse):
 
     # Loop through coarse elements
     for i in range(grid_coarse['n']):
+        # Extract
         extract = elmt_extract(u, i, grid_coarse)
-        insert = np.matmul(grid_coarse['I'], extract)
-        insert = elmt_insert(insert, i, grid_false)
 
-        u_return = np.array([u_return[j] if u_return[j] else insert[j] for j in range(grid_fine['pts'])])
+        # Interpolate
+        insert = np.matmul(grid_coarse['I'], extract)
+
+        # Zero right and bottom
+        insert[0 : 3] = np.zeros(3)
+        insert[5] = 0
+        insert[8] = 0
+
+        # Insert
+        insert = elmt_insert(insert, i, grid_false)
+        u_return += insert
 
     return u_return
 
@@ -618,8 +646,8 @@ import matplotlib.pyplot as plt
 
 p_deg = 3                               # degree of shape functions
 q_deg = 4                               # degree of quadrature
-levels = 3                              # number of muligrid levels
-n_x = 9 * 2 ** (levels - 1)             # number of elements in x
+levels = 6                              # number of muligrid levels
+n_x = 2 * 2 ** (levels - 1)             # number of elements in x
 n = n_x * n_x                           # number of elements
 pts_x = n_x * (p_deg + 1) - (n_x - 1)   # number of points in x
 pts = pts_x ** 2                        # number of points
@@ -673,27 +701,44 @@ u_0 = np.random.rand(grid['pts'])
 tic = time.time()
 u_cg = cg_solve(u_0, f_vec, max_itr, tol, op_mats, op_par, grid, u_boundary)
 toc = time.time()
-print('Inf Norm: ' + str(np.max(np.abs(u_true - u_cg))))
-print('Time: ' + str(toc - tic))
+cg_error = np.max(np.abs(u_true - u_cg))
+cg_time = toc - tic
+print('Inf Norm: ' + str(cg_error))
+print('Time: ' + str(cg_time))
 
 # FMG solve
 print('\n')
 print('Full Multigrid')
 tic = time.time()
-u_fmg = fmg_solve(f_vec, levels, tol * 10 ** 3, op_mats, op_par, grid, u_boundary)
+u_fmg = fmg_solve(f_vec, levels, tol * 10 ** 11, op_mats, op_par, grid, u_boundary)
 toc = time.time()
-print('Inf Norm: ' + str(np.max(np.abs(u_true - u_fmg))))
-print('Time: ' + str(toc - tic))
+fmg_error = np.max(np.abs(u_true - u_fmg))
+fmg_time = toc - tic
+print('Inf Norm: ' + str(fmg_error))
+print('Time: ' + str(fmg_time))
 
 
 # Plot
+# Setup
 fig, axarr = plt.subplots(2, 2)
-axarr[0, 0].contourf(X, Y, u_cg.reshape(grid['pts_x'], grid['pts_x']))
-axarr[0, 0].title.set_text('CG Result')
-axarr[0, 1].contourf(X, Y, u_fmg.reshape(grid['pts_x'], grid['pts_x']))
-axarr[0, 1].title.set_text('FMG Result')
-axarr[1, 0].contourf(X, Y, (u_true - u_cg).reshape(grid['pts_x'], grid['pts_x']))
-axarr[1, 0].title.set_text('CG Error')
-axarr[1, 1].contourf(X, Y, (u_true - u_fmg).reshape(grid['pts_x'], grid['pts_x']))
-axarr[1, 1].title.set_text('FMG Error')
+plt.rc('text', usetex=True)
+plt.rc('font', family='serif')
+plt.suptitle('CG vs FMG\np = %d, %d elements, %d levels' % (grid['p_deg'], grid['n'], levels), fontsize = 16)
+# CG Solution
+im = axarr[0, 0].contourf(X, Y, u_cg.reshape(grid['pts_x'], grid['pts_x']), cmap=plt.cm.jet)
+axarr[0, 0].title.set_text('CG Solution\n%02f sec' % cg_time)
+plt.colorbar(im, ax = axarr[0, 0])
+# FMG Solution
+im = axarr[0, 1].contourf(X, Y, u_fmg.reshape(grid['pts_x'], grid['pts_x']), cmap=plt.cm.jet)
+axarr[0, 1].title.set_text('FMG Solution\n%02f sec' % fmg_time)
+plt.colorbar(im, ax = axarr[0, 1])
+# CG Error
+im = axarr[1, 0].contourf(X, Y, (u_true - u_cg).reshape(grid['pts_x'], grid['pts_x']), cmap=plt.cm.jet)
+axarr[1, 0].title.set_text('CG Error\n$||error||_\infty =$ %02e' % cg_error)
+plt.colorbar(im, ax = axarr[1, 0])
+# FMG Error
+im = axarr[1, 1].contourf(X, Y, (u_true - u_fmg).reshape(grid['pts_x'], grid['pts_x']), cmap=plt.cm.jet)
+axarr[1, 1].title.set_text('FMG Error\n$||error||_\infty =$ %02e' % fmg_error)
+plt.colorbar(im, ax = axarr[1, 1])
+# Show
 plt.show()
